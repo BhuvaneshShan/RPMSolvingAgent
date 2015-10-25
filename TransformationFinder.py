@@ -43,7 +43,15 @@ class TransformationFinder:
     def FindSuperTx(self,A,B,C):
         Tx = TransformationFrame()
         Tx.assignTxScore(Transformation.ConstantAddition,self.ConstantAddition(A,B,C))
+        Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
         return Tx
+
+    def Divergence(self,A,B,C):
+        ABscore, ABloc, ABlor, ABroc, ABror = self.RepetitionByTranslation(A,B)
+        ACscore, ACloc, AClor, ACroc, ACror = self.RepetitionByTranslation(A,C)
+        if abs(ABscore-ACscore)<3:
+            return (ABscore+ACscore)/2, ABscore, ACscore
+        return 0,0,0
 
     def ConstantAddition(self,A,B,C):
         AminusB = ImageChops.difference(A,B)
@@ -303,8 +311,8 @@ class TransformationFinder:
                 #right_offset_row = f[3] - s[3]
                 A2 = ImageChops.offset(A,right_offset_col,right_offset_row)
                 ADash = ImageChops.lighter(A1, A2)
-                #ADash.save("adash.png","PNG")
-                #B.save("b.png","PNG")
+                ADash.save("adash.png","PNG")
+                B.save("b.png","PNG")
                 score = self.Similarity(ADash,B)
                 details = score, left_offset_col, left_offset_row, right_offset_col, right_offset_row
                 return details

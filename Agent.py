@@ -56,8 +56,8 @@ class Agent:
         self.problem_number += 1
         print("Solving "+str(self.problem_number))
         self.Initialize()
-
-        if problem.problemType == '3x3' and self.problem_number>=1 and self.problem_number<=12:
+        answer = -1
+        if problem.problemType == '3x3' and self.problem_number>=10 and self.problem_number<=10:
             #Get images
             A = problem.figures['A'].visualFilename
             A = self.ToBinary(A)
@@ -91,6 +91,7 @@ class Agent:
                 #t2 = tx.RepetitionByTranslation(A,B)
                 pass
             print(" Hor Solution:"+str(HorTxSolution))
+            answer = HorTxSolution
         result = problem.correctAnswer
         """
         #2x2 solving (Assuming A,B,C and D only in rpm)
@@ -113,7 +114,7 @@ class Agent:
         result = self.Test(D)
         """
         print(" Answer: "+str(result))
-        return result
+        return answer
 
     def Initialize(self):
         self.answerChoices = []
@@ -202,6 +203,13 @@ class Agent:
                         if self.AlmostEqual(score,BestTxScore,1):
                             if self.AlmostEqual(HIAddArea,BestTxDetails[1],1):
                                 solution = i
+                    elif BestTxType == Transformation.Divergence:
+                        print("Checking Divergence")
+                        score, GHScore, GIScore = Tx.Divergence(G,H,choices[i])
+                        #print(str(BestTxScore)+","+str(BestTxDetails[0])+","+str(BestTxDetails[1]))
+                        print(str(score)+","+str(GHScore)+","+str(GIScore))
+                        if self.AlmostEqual(score,BestTxScore,2):
+                            solution = i
                     elif BestTxType == Transformation.RepetitionByExpansion:
                         print("Checking Rept by Exp")
                         score, xgrowth, ygrowth = Tx.RepetitionByExpansion(H,choices[i])
