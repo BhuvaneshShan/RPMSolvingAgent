@@ -10,6 +10,8 @@ class Transformation(Enum):
     ScalingOfOneObject = 5
     ConstantAddition = 6
     Divergence = 7
+    Convergence = 8
+    Migration = 9
     Scaling = 10
     """
     ShapeChange = 0

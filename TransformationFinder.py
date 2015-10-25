@@ -4,6 +4,7 @@ from Utilities import Transformation, Blob
 from PIL import Image, ImageChops, ImageDraw
 from collections import deque, defaultdict
 import math
+import time
 
 class TransformationFinder:
     def __init__(self):
@@ -12,9 +13,33 @@ class TransformationFinder:
         self.IMAGE_WIDTH = 0
         self.IMAGE_HEIGHT = 0
 
-    def FindTx(self,A,B):
+    def FindTx(self,A,B,C):
         self.IMAGE_WIDTH = A.width
-        self.IMAGE_HEIGHT = B.height
+        self.IMAGE_HEIGHT = A.height
+        ThresholdScore = 99
+        Tx = []
+        self.BlobsA = self.GetBlobs(A)
+        #self.showBlobs(A,BlobsA)
+        self.BlobsB = self.GetBlobs(B)
+        self.BlobsC = self.GetBlobs(C)
+
+        #Super Transformations (level 1)
+        Tx0 = self.FindSuperTx(A,B,C)
+        Tx.append(Tx0)
+
+        #Figure Transformations (level 2)
+        Tx1 = self.FindFigureTx(A,B)
+        Tx2 = self.FindFigureTx(B,C)
+        Tx.append([Tx1,Tx2])
+
+        #Blob Transformations (level 3)
+        if max(Tx1.getHighestScore(),Tx2.getHighestScore()) < ThresholdScore:
+            Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
+            Tx4 = self.FindBlobTx(B,self.BlobsB,C,self.BlobsC)
+            Tx.append([Tx3,Tx4])
+        return Tx
+
+    def FindFigureTx(self,A,B):
         Tx = TransformationFrame()
         #Transformations (level 2)
         Tx.assignTxScore(Transformation.Empty,(self.Similarity(A,B),0))
@@ -23,16 +48,13 @@ class TransformationFinder:
         #Tx.assignTxScore(Transformation.RepetitionByCircularTranslation,self.RepetitionByCircularTranslation(A,B))
         return Tx
 
-    def FindBlobTx(self,A,B):
+    def FindBlobTx(self,A,BlobsA,B,BlobsB):
         Tx = TransformationFrame()
-        #Blob Transformations ( level 3)
-        BlobsA = self.GetBlobs(A)
-        #self.showBlobs(A,BlobsA)
         Tx.Blobs.append(BlobsA)
-        BlobsB = self.GetBlobs(B)
         Tx.Blobs.append(BlobsB)
         Tx.corresp = self.GetBlobCorrespondence(BlobsA, BlobsB)
         Tx.BlobMetaData = self.GetBlobMetaData(Tx.corresp,BlobsA,BlobsB)
+        #Blob Transformations ( level 3)
         if Tx.BlobMetaData['repetition'] == False:
             #only if more than one obj is present in figure
             if len(Tx.corresp.keys()) > 1:
@@ -44,14 +66,71 @@ class TransformationFinder:
         Tx = TransformationFrame()
         Tx.assignTxScore(Transformation.ConstantAddition,self.ConstantAddition(A,B,C))
         Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
+        Tx.assignTxScore(Transformation.Convergence,self.Convergence(A,B,C))
+        correspAC = self.GetBlobCorrespondence(self.BlobsA,self.BlobsC)
+        ACMetaData = self.GetBlobMetaData(correspAC,self.BlobsA,self.BlobsC)
+        if ACMetaData['repetition'] == False and ACMetaData['oneToOne'] == True:
+            Tx.assignTxScore(Transformation.Migration,self.Migration(A,B,C))
         return Tx
 
+    def Migration(self,A,B,C):
+        #Horizontal migration
+        #A super transformation where blobs in A from their end migrate to pos in C in the other end via B
+        if self.IMAGE_WIDTH == 0 or self.IMAGE_HEIGHT == 0:
+            self.IMAGE_WIDTH = A.width
+            self.IMAGE_HEIGHT = A.height
+        migDir = []
+        migCol = []
+        ABscore = 0
+        BCscore = 0
+        croppedBlobs = []
+        migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+        for b in self.BlobsA[:]:
+            if b.startCol<self.IMAGE_WIDTH/2:
+                migDir.append(1)
+            else:
+                migDir.append(-1)
+            migCol.append(b.startCol)
+            cropped = A.crop((b.startCol,b.startRow,b.endCol,b.endRow))
+            croppedBlobs.append(cropped)
+        for i in range(1,int(self.IMAGE_WIDTH  - migCol[0])+1):
+            migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+            for b in self.BlobsA:
+                newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                migCol[b.id] = migCol[b.id]+migDir[b.id]
+                newImage.paste(croppedBlobs[b.id],(migCol[b.id],b.startRow))
+                migImage = ImageChops.lighter(migImage,newImage)
+            score = self.Similarity(migImage,B)
+            if score >= 98:
+                ABscore = score
+                break
+        migImage.save(str(time.time())+"_AB.png","PNG")
+        if ABscore >= 98:
+            for i in range(1,int(self.IMAGE_WIDTH - migCol[0])+1):
+                migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                for b in self.BlobsA:
+                    newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                    migCol[b.id] = migCol[b.id]+migDir[b.id]
+                    newImage.paste(croppedBlobs[b.id],(migCol[b.id],b.startRow))
+                    migImage = ImageChops.lighter(migImage,newImage)
+                score = self.Similarity(migImage,C)
+                if score >= 96:
+                    BCscore = score
+                    break
+        migImage.save(str(time.time())+"_BC.png","PNG")
+        return (ABscore+BCscore)/2, ABscore, BCscore
+
     def Divergence(self,A,B,C):
+        #A super transformation where object in A splits into two
         ABscore, ABloc, ABlor, ABroc, ABror = self.RepetitionByTranslation(A,B)
         ACscore, ACloc, AClor, ACroc, ACror = self.RepetitionByTranslation(A,C)
         if abs(ABscore-ACscore)<3:
             return (ABscore+ACscore)/2, ABscore, ACscore
         return 0,0,0
+
+    def Convergence(self,A,B,C):
+        #A super transformation where objects in A merge into one
+        return self.Divergence(C,B,A)
 
     def ConstantAddition(self,A,B,C):
         AminusB = ImageChops.difference(A,B)
@@ -99,13 +178,19 @@ class TransformationFinder:
 
     def GetBlobMetaData(self, correspondences, ba, bb):
         repetition = False
+        oneToOne = True
         fillPercentage = []
         for key,val in correspondences.items():
             if len(val)>1:
                 repetition = True
+                oneToOne = False
             else:
                 fillPercentage.append((key,val,abs(ba[key].fill-bb[val[0][0]].fill)))
-        metaData= {'repetition':repetition,'fillComparison':fillPercentage}
+            if len(val) == 0:
+                oneToOne = False
+        if len(correspondences) < len(ba):
+            oneToOne = False
+        metaData= {'repetition':repetition,'fillComparison':fillPercentage,'oneToOne':oneToOne}
         return metaData
 
     def RepetitionByCircularTranslation(self,A,B):

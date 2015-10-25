@@ -57,7 +57,7 @@ class Agent:
         print("Solving "+str(self.problem_number))
         self.Initialize()
         answer = -1
-        if problem.problemType == '3x3' and self.problem_number>=10 and self.problem_number<=10:
+        if problem.problemType == '3x3' and self.problem_number>=1 and self.problem_number<=12:
             #Get images
             A = problem.figures['A'].visualFilename
             A = self.ToBinary(A)
@@ -120,25 +120,9 @@ class Agent:
         self.answerChoices = []
 
     def FindTransformation(self,A,B,C):
-        ThresholdScore = 99
         TxManager = TransformationFinder()
-        Tx = []
-        #Super Transformations (level 1)
-        Tx0 = TxManager.FindSuperTx(A,B,C)
-        Tx.append(Tx0)
-
-        #Image Transformations (level 2)
-        Tx1 = TxManager.FindTx(A,B)
-        Tx2 = TxManager.FindTx(B,C)
-        Tx.append([Tx1,Tx2])
-
-        if max(Tx1.getHighestScore(),Tx2.getHighestScore()) < ThresholdScore:
-            #Blob Transformations (level 3)
-            Tx3 = TxManager.FindBlobTx(A,B)
-            Tx4 = TxManager.FindBlobTx(B,C)
-            Tx.append([Tx3,Tx4])
         #Tx = [Tx0,[Tx1,Tx2],[Tx3,Tx4]]
-        return Tx
+        return TxManager.FindTx(A,B,C)
 
     def GetBestTransformation(self,Txs):
         BestTxType = Transformation.Empty
@@ -181,6 +165,8 @@ class Agent:
             choices.append(self.ToBinary(option))
         solution = -1
         Tx = TransformationFinder()
+        Tx.BlobsA = Tx.GetBlobs(G)
+        Tx.BlobsB = Tx.GetBlobs(H)
         for t in BestTx[:]:
             BestTxType = t[0]
             BestTxScore = t[1]
@@ -210,6 +196,24 @@ class Agent:
                         print(str(score)+","+str(GHScore)+","+str(GIScore))
                         if self.AlmostEqual(score,BestTxScore,2):
                             solution = i
+                    elif BestTxType == Transformation.Convergence:
+                        print("Checking Convergence")
+                        score, GHScore, GIScore = Tx.Convergence(G,H,choices[i])
+                        #print(str(BestTxScore)+","+str(BestTxDetails[0])+","+str(BestTxDetails[1]))
+                        print(str(score)+","+str(GHScore)+","+str(GIScore))
+                        if self.AlmostEqual(score,BestTxScore,2):
+                            solution = i
+                    elif BestTxType == Transformation.Migration:
+                        Tx.BlobsC = Tx.GetBlobs(choices[i])
+                        correspGI = Tx.GetBlobCorrespondence(Tx.BlobsA,Tx.BlobsC)
+                        GIMetaData = Tx.GetBlobMetaData(correspGI,Tx.BlobsA,Tx.BlobsC)
+                        if GIMetaData['repetition'] == False and GIMetaData['oneToOne'] == True:
+                            print("Checking Migration")
+                            score, GHScore, GIScore = Tx.Migration(G,H,choices[i])
+                            print(str(BestTxScore)+","+str(BestTxDetails[0])+","+str(BestTxDetails[1]))
+                            print(str(score)+","+str(GHScore)+","+str(GIScore))
+                            if self.AlmostEqual(score,BestTxScore,1):
+                                solution = i
                     elif BestTxType == Transformation.RepetitionByExpansion:
                         print("Checking Rept by Exp")
                         score, xgrowth, ygrowth = Tx.RepetitionByExpansion(H,choices[i])
