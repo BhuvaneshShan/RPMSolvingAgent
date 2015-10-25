@@ -20,6 +20,11 @@ class TransformationFinder:
         Tx.assignTxScore(Transformation.Empty,(self.Similarity(A,B),0))
         Tx.assignTxScore(Transformation.RepetitionByExpansion,self.RepetitionByExpansion(A,B))
         Tx.assignTxScore(Transformation.RepetitionByTranslation,self.RepetitionByTranslation(A,B))
+        #Tx.assignTxScore(Transformation.RepetitionByCircularTranslation,self.RepetitionByCircularTranslation(A,B))
+        return Tx
+
+    def FindBlobTx(self,A,B):
+        Tx = TransformationFrame()
         #Blob Transformations ( level 3)
         BlobsA = self.GetBlobs(A)
         #self.showBlobs(A,BlobsA)
@@ -27,13 +32,12 @@ class TransformationFinder:
         BlobsB = self.GetBlobs(B)
         Tx.Blobs.append(BlobsB)
         Tx.corresp = self.GetBlobCorrespondence(BlobsA, BlobsB)
-        Tx.BlobMetaData = self.GetBlobMetaData(Tx.corresp)
+        Tx.BlobMetaData = self.GetBlobMetaData(Tx.corresp,BlobsA,BlobsB)
         if Tx.BlobMetaData['repetition'] == False:
             #only if more than one obj is present in figure
             if len(Tx.corresp.keys()) > 1:
                 Tx.assignTxScore(Transformation.ScalingOfOneObject,self.ScalingOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
                 Tx.assignTxScore(Transformation.TranslationOfOneObject,self.TranslationOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
-        #Tx.assignTxScore(Transformation.RepetitionByCircularTranslation,self.RepetitionByCircularTranslation(A,B))
         return Tx
 
     def FindSuperTx(self,A,B,C):
@@ -47,8 +51,13 @@ class TransformationFinder:
         BminusC = ImageChops.difference(B,C)
         BCAdditionArea = self.getFillPercentage(BminusC,0,0,BminusC.width,BminusC.height)
         score = 0
-        if abs(ABAdditionArea - BCAdditionArea) < 1:
-            score = 100
+        #print("In Const Add:")
+        #print("AB Added area:"+str(ABAdditionArea))
+        #print("BC Added area:"+str(BCAdditionArea))
+        if ABAdditionArea > 1 and BCAdditionArea > 1:
+            if abs(ABAdditionArea - BCAdditionArea) < 4:
+                similarity = self.Similarity(C,ImageChops.lighter(B,ImageChops.difference(B,C)))
+                score = similarity
         return  score, ABAdditionArea, BCAdditionArea
 
     def ScalingOfOneObject(self,corresp, BlobsA, BlobsB):
@@ -80,12 +89,15 @@ class TransformationFinder:
         rowOffset = b.startRow - a.startRow
         return colOffset, rowOffset
 
-    def GetBlobMetaData(self, correspondences):
+    def GetBlobMetaData(self, correspondences, ba, bb):
         repetition = False
+        fillPercentage = []
         for key,val in correspondences.items():
             if len(val)>1:
                 repetition = True
-        metaData= {'repetition':repetition}
+            else:
+                fillPercentage.append((key,val,abs(ba[key].fill-bb[val[0][0]].fill)))
+        metaData= {'repetition':repetition,'fillComparison':fillPercentage}
         return metaData
 
     def RepetitionByCircularTranslation(self,A,B):
@@ -150,7 +162,7 @@ class TransformationFinder:
         bb = BlobsB
         corresp = defaultdict(list)
         for b in bb[:]:
-            minDiff = 99
+            minDiff = 99 #sum of attribute differences . attributes include start row, start col, width, height, fill
             corBlobId = 0
             for a in ba[:]:
                 s = self.getBlobSimilarityScore(b,a)
@@ -362,6 +374,12 @@ class TransformationFrame:
         if self.txScores[self.txType] < details[0]:
             self.txType = transType
             self.txDetails = details[1:]
+    def getHighestScore(self):
+        return self.txScores[self.txType]
+    def getBestTransformation(self):
+        return self.txType
+    def getBestTxDetails(self):
+        return self.txDetails
 
 class BlobFrame:
     def __init__(self):
