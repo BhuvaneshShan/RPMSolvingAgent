@@ -12,6 +12,7 @@ class Transformation(Enum):
     Divergence = 7
     Convergence = 8
     Migration = 9
+    ConstantSubtraction = 11
     Scaling = 10
     """
     ShapeChange = 0

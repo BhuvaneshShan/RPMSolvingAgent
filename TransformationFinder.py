@@ -65,6 +65,7 @@ class TransformationFinder:
     def FindSuperTx(self,A,B,C):
         Tx = TransformationFrame()
         Tx.assignTxScore(Transformation.ConstantAddition,self.ConstantAddition(A,B,C))
+        Tx.assignTxScore(Transformation.ConstantSubtraction,self.ConstantSubtraction(A,B,C))
         Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
         Tx.assignTxScore(Transformation.Convergence,self.Convergence(A,B,C))
         correspAC = self.GetBlobCorrespondence(self.BlobsA,self.BlobsC)
@@ -104,7 +105,7 @@ class TransformationFinder:
             if score >= 98:
                 ABscore = score
                 break
-        migImage.save(str(time.time())+"_AB.png","PNG")
+        #migImage.save(str(time.time())+"_AB.png","PNG")
         if ABscore >= 98:
             for i in range(1,int(self.IMAGE_WIDTH - migCol[0])+1):
                 migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
@@ -117,7 +118,7 @@ class TransformationFinder:
                 if score >= 96:
                     BCscore = score
                     break
-        migImage.save(str(time.time())+"_BC.png","PNG")
+        #migImage.save(str(time.time())+"_BC.png","PNG")
         return (ABscore+BCscore)/2, ABscore, BCscore
 
     def Divergence(self,A,B,C):
@@ -146,6 +147,24 @@ class TransformationFinder:
                 similarity = self.Similarity(C,ImageChops.lighter(B,ImageChops.difference(B,C)))
                 score = similarity
         return  score, ABAdditionArea, BCAdditionArea
+
+    def ConstantSubtraction(self,A,B,C):
+        score, BCSubArea, ABSubArea = self.ConstantAddition(C,B,A)
+        """
+        AminusB = ImageChops.difference(A,B)
+        ABSubArea = self.getFillPercentage(AminusB,0,0,AminusB.width,AminusB.height)
+        BminusC = ImageChops.difference(B,C)
+        BCSubArea = self.getFillPercentage(BminusC,0,0,BminusC.width,BminusC.height)
+        score = 0
+        #print("In Const Sub:")
+        #print("AB Sub area:"+str(ABSubArea))
+        #print("BC Sub area:"+str(BCSubArea))
+        if ABSubArea > 1 and BCSubArea > 1:
+            if abs(ABSubArea - BCSubArea) < 4:
+                similarity = self.Similarity(B,ImageChops.lighter(C,ImageChops.difference(B,C)))
+                score = similarity
+        """
+        return  score, ABSubArea, BCSubArea
 
     def ScalingOfOneObject(self,corresp, BlobsA, BlobsB):
         widthScaling = 0
@@ -192,7 +211,7 @@ class TransformationFinder:
             oneToOne = False
         metaData= {'repetition':repetition,'fillComparison':fillPercentage,'oneToOne':oneToOne}
         return metaData
-
+    """
     def RepetitionByCircularTranslation(self,A,B):
         #get trans details
         score = 0
@@ -214,7 +233,7 @@ class TransformationFinder:
         #give them as blob frames
         details = score, angle, aid, bid, BlobsA, BlobsB
         return details
-
+    """
     def checkCircularTranslation(self, blobA, blobB):
         centerRow = self.IMAGE_HEIGHT/2
         centerCol = self.IMAGE_WIDTH/2
@@ -396,8 +415,8 @@ class TransformationFinder:
                 #right_offset_row = f[3] - s[3]
                 A2 = ImageChops.offset(A,right_offset_col,right_offset_row)
                 ADash = ImageChops.lighter(A1, A2)
-                ADash.save("adash.png","PNG")
-                B.save("b.png","PNG")
+                #ADash.save("adash.png","PNG")
+                #B.save("b.png","PNG")
                 score = self.Similarity(ADash,B)
                 details = score, left_offset_col, left_offset_row, right_offset_col, right_offset_row
                 return details
