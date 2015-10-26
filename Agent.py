@@ -82,13 +82,13 @@ class Agent:
             #self.dispTx(Tx_Hor)
             Tx_Ver = self.FindTransformation(A,D,G)
             #self.dispTx(Tx_Ver)
-
+            #Ordering of Txs
             BestTxHor = self.GetBestTransformation(Tx_Hor)
             HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxHor)
 
             BestTxVer = self.GetBestTransformation(Tx_Ver)
             VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxVer,HorTxSolutionSet)
-
+            #Analysing solution set
             Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
             print(" Solution:"+str(Solution))
             answer = Solution
