@@ -92,7 +92,6 @@ class Agent:
             Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
             print(" Solution:"+str(Solution))
             answer = Solution
-        result = problem.correctAnswer
         """
         #2x2 solving (Assuming A,B,C and D only in rpm)
         A = problem.figures['A']
@@ -113,7 +112,8 @@ class Agent:
         D = self.Combine(Dr,Dc)
         result = self.Test(D)
         """
-        print(" Answer: "+str(result))
+        #result = problem.correctAnswer
+        #print(" Answer: "+str(result))
         return answer
 
     def Initialize(self):
