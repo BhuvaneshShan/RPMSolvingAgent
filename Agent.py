@@ -28,6 +28,10 @@ class Agent:
         self.TwoX2ChoiceCount = 6
         self.ThreeX3ChoiceCount = 8
         self.answerChoices = []
+        self.DEBUG = True;
+        self.debugLevel = 1;
+        self.Diagonal = 'Diagonal'
+        self.HorVert = 'HorVert'
 
     # The primary method for solving incoming Raven's Progressive Matrices.
     # For each problem, your Agent's Solve() method will be called. At the
@@ -56,7 +60,7 @@ class Agent:
         self.problem_number += 1
         print("Solving "+str(self.problem_number))
         self.Initialize()
-        answer = -1
+        Solution = -1
         if problem.problemType == '3x3':
             #Get images
             A = problem.figures['A'].visualFilename
@@ -82,16 +86,24 @@ class Agent:
             #self.dispTx(Tx_Hor)
             Tx_Ver = self.FindTransformation(A,D,G)
             #self.dispTx(Tx_Ver)
-            #Ordering of Txs
-            BestTxHor = self.GetBestTransformation(Tx_Hor)
-            HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxHor)
+            Tx_Diag = self.FindDiagTransformation(A,E)
 
-            BestTxVer = self.GetBestTransformation(Tx_Ver)
-            VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxVer,HorTxSolutionSet)
-            #Analysing solution set
-            Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
+            #Ordering of Txs
+            BestTxsDiag = self.GetBestTransformations(Tx_Diag)
+            BestTxsHor = self.GetBestTransformations(Tx_Hor)
+
+            #Diag vs HorVert
+            if self.DiagVsHorVert(BestTxsDiag,BestTxsHor) == self.Diagonal:
+                DiagTxSolutionSet = self.CompareAndGetSolution(A,E,BestTxsDiag)
+                Solution = self.GetBestSolution(DiagTxSolutionSet)
+            else:
+                HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxsHor)
+                #Ordering of Txs
+                BestTxsVer = self.GetBestTransformations(Tx_Ver)
+                VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxsVer,HorTxSolutionSet)
+                #Analysing solution set
+                Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
             print(" Solution:"+str(Solution))
-            answer = Solution
         """
         #2x2 solving (Assuming A,B,C and D only in rpm)
         A = problem.figures['A']
@@ -112,9 +124,11 @@ class Agent:
         D = self.Combine(Dr,Dc)
         result = self.Test(D)
         """
-        #result = problem.correctAnswer
-        #print(" Answer: "+str(result))
-        return answer
+        if(Solution==problem.correctAnswer):
+            print(" Correct Answer: "+str(problem.correctAnswer)+" +")
+        else:
+            print(" Correct Answer: "+str(problem.correctAnswer)+" -")
+        return Solution
 
     def Initialize(self):
         self.answerChoices = []
@@ -124,7 +138,18 @@ class Agent:
         #Tx = [Tx0,[Tx1,Tx2],[Tx3,Tx4]]
         return TxManager.FindTx(A,B,C)
 
-    def GetBestTransformation(self,Txs):
+    def FindDiagTransformation(self,A,B):
+        TxManager = TransformationFinder()
+        #Tx = [Tx1,Tx3]
+        return TxManager.FindDiagTx(A,B);
+
+    def DiagVsHorVert(self, diagTxs, horTxs):
+        if diagTxs[0][1] >= horTxs[0][1]:
+                return self.Diagonal
+        else:
+                return self.HorVert
+
+    def GetBestTransformations(self,Txs):
         BestTxType = Transformation.Empty
         BestTxScore = 0
         BestTxDetails = []
@@ -135,27 +160,49 @@ class Agent:
         BestTxDetails = Txs[0].getBestTxDetails();
         BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
         if len(Txs) > 1:
-            #have to do analysis between first and second tx ... still...
-            t = Txs[1][0]
-            BestTxType = t.getBestTransformation();
-            BestTxScore = t.getHighestScore();
-            BestTxDetails = t.getBestTxDetails();
-            if BestTxScore > BestTxsList[0][1]:
-                BestTxsList.insert(0,[BestTxType,BestTxScore,BestTxDetails])
+            if isinstance(Txs[1],list):
+                #have to do analysis between first and second tx ... still...
+                t = Txs[1][0]
+                BestTxType = t.getBestTransformation();
+                BestTxScore = t.getHighestScore();
+                BestTxDetails = t.getBestTxDetails();
+                if BestTxScore > BestTxsList[0][1]:
+                    BestTxsList.insert(0,[BestTxType,BestTxScore,BestTxDetails])
+                else:
+                    BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
             else:
-                BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
+                t = Txs[1]
+                BestTxType = t.getBestTransformation();
+                BestTxScore = t.getHighestScore();
+                BestTxDetails = t.getBestTxDetails();
+                if BestTxScore > BestTxsList[0][1]:
+                    BestTxsList.insert(0,[BestTxType,BestTxScore,BestTxDetails])
+                else:
+                    BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
         if len(Txs) > 2:
-            #have to do analysis between first and second tx ... still...
-            t = Txs[2][0]
-            BestTxType = t.getBestTransformation();
-            BestTxScore = t.getHighestScore();
-            BestTxDetails = t.getBestTxDetails();
-            if BestTxScore > BestTxsList[0][1]:
-                BestTxsList.insert(0,[BestTxType,BestTxScore,BestTxDetails])
-            elif BestTxScore > BestTxsList[1][1]:
-                BestTxsList.insert(1,[BestTxType,BestTxScore,BestTxDetails])
+            if isinstance(Txs[2],list):
+                #have to do analysis between first and second tx ... still...
+                t = Txs[2][0]
+                BestTxType = t.getBestTransformation();
+                BestTxScore = t.getHighestScore();
+                BestTxDetails = t.getBestTxDetails();
+                if BestTxScore > BestTxsList[0][1]:
+                    BestTxsList.insert(0,[BestTxType,BestTxScore,BestTxDetails])
+                elif BestTxScore > BestTxsList[1][1]:
+                    BestTxsList.insert(1,[BestTxType,BestTxScore,BestTxDetails])
+                else:
+                    BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
             else:
-                BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
+                t = Txs[2]
+                BestTxType = t.getBestTransformation();
+                BestTxScore = t.getHighestScore();
+                BestTxDetails = t.getBestTxDetails();
+                if BestTxScore > BestTxsList[0][1]:
+                    BestTxsList.insert(0,[BestTxType,BestTxScore,BestTxDetails])
+                elif BestTxScore > BestTxsList[1][1]:
+                    BestTxsList.insert(1,[BestTxType,BestTxScore,BestTxDetails])
+                else:
+                    BestTxsList.append([BestTxType,BestTxScore,BestTxDetails])
         return BestTxsList
 
     def CompareAndGetSolution(self,G,H,BestTx,HorSolSet = None):
@@ -180,9 +227,9 @@ class Agent:
             if solution == -1:
                 for i in ToCheckChoices[:]:
                     #print("Checking ans "+str(i))
-                    if BestTxType == Transformation.Empty:
+                    if BestTxType == Transformation.Same:
                         #print("Checking Tx Empty")
-                        score = Tx.Similarity(H,choices[i])
+                        score = Tx.Same(H,choices[i])
                         #print("Scores:"+str(score)+":"+str(BestTxScore))
                         if score > 97:
                             #if self.AlmostEqual(score,BestTxScore,2):
@@ -321,13 +368,16 @@ class Agent:
             return self.GetBestSolution(VerSolSet)
 
     def GetBestSolution(self, solSet):
-        solution = solSet[0][0]
-        minDeviation = solSet[0][1]
-        for t in solSet[:]:
-            if t[1]<=minDeviation:
-                solution = t[0]
-                minDeviation = t[1]
-        return solution
+        if len(solSet) > 0:
+            solution = solSet[0][0]
+            minDeviation = solSet[0][1]
+            for t in solSet[:]:
+                if t[1]<=minDeviation:
+                    solution = t[0]
+                    minDeviation = t[1]
+            return solution
+        else:
+            return -1
 
     def GetDeviation(self,val1,val2):
         return abs(val1-val2)
@@ -338,13 +388,18 @@ class Agent:
         else:
             return False
 
-    def ToBinary(self,A):
-        image_file = Image.open(A) # open colour image
-        image_file = image_file.convert('1') # convert image to black and white
+    def ToBinary(self, a):
+        image_file = Image.open(a)  # open colour image
+        image_file = image_file.convert('1')  # convert image to black and white
         image_file = ImageChops.invert(image_file)
         #new_name = "A.png"
         #image_file.save(new_name)
         return image_file
+
+    def dprint(self, level, sent):
+        if self.DEBUG:
+            if level <= self.debugLevel:
+                print(sent)
 
     def dispTx(self,txs):
         print("SuperTx:")

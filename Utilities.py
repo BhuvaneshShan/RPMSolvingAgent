@@ -3,6 +3,7 @@ from enum import Enum
 
 class Transformation(Enum):
     Empty = 0
+    Same = 12
     RepetitionByExpansion = 1 #aka scaling or expansion
     RepetitionByTranslation = 2
     RepetitionByCircularTranslation = 3

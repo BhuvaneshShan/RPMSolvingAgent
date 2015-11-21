@@ -12,11 +12,11 @@ class TransformationFinder:
         self.PIXEL_NOT_PRESENT = 0
         self.IMAGE_WIDTH = 0
         self.IMAGE_HEIGHT = 0
+        self.ThresholdScore = 99
 
     def FindTx(self,A,B,C):
         self.IMAGE_WIDTH = A.width
         self.IMAGE_HEIGHT = A.height
-        ThresholdScore = 99
         Tx = []
         self.BlobsA = self.GetBlobs(A)
         #self.showBlobs(A,BlobsA)
@@ -33,18 +33,36 @@ class TransformationFinder:
         Tx.append([Tx1,Tx2])
 
         #Blob Transformations (level 3)
-        if max(Tx1.getHighestScore(),Tx2.getHighestScore()) < ThresholdScore:
+        if max(Tx1.getHighestScore(),Tx2.getHighestScore()) < self.ThresholdScore:
             Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
             Tx4 = self.FindBlobTx(B,self.BlobsB,C,self.BlobsC)
             Tx.append([Tx3,Tx4])
         return Tx
 
+    def FindDiagTx(self,A,B):
+        self.IMAGE_WIDTH = A.width
+        self.IMAGE_HEIGHT = A.height
+        Tx = []
+        self.BlobsA = self.GetBlobs(A)
+        self.BlobsB = self.GetBlobs(B)
+
+        #Figure Transformations (level 2)
+        Tx1 = self.FindFigureTx(A,B)
+        Tx.append(Tx1)
+
+        #Blob Transformations (level 3)
+        if Tx1.getHighestScore() < self.ThresholdScore:
+            Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
+            Tx.append(Tx3)
+        return Tx
+
     def FindFigureTx(self,A,B):
         Tx = TransformationFrame()
         #Transformations (level 2)
-        Tx.assignTxScore(Transformation.Empty,(self.Similarity(A,B),0))
-        Tx.assignTxScore(Transformation.RepetitionByExpansion,self.RepetitionByExpansion(A,B))
-        Tx.assignTxScore(Transformation.RepetitionByTranslation,self.RepetitionByTranslation(A,B))
+        Tx.assignTxScore(Transformation.Same,(self.Same(A,B),0))
+        if Tx.getHighestScore() < self.ThresholdScore:
+            Tx.assignTxScore(Transformation.RepetitionByExpansion,self.RepetitionByExpansion(A,B))
+            Tx.assignTxScore(Transformation.RepetitionByTranslation,self.RepetitionByTranslation(A,B))
         #Tx.assignTxScore(Transformation.RepetitionByCircularTranslation,self.RepetitionByCircularTranslation(A,B))
         return Tx
 
@@ -178,19 +196,22 @@ class TransformationFinder:
         return self.Divergence(C,B,A)
 
     def ConstantAddition(self,A,B,C):
-        AminusB = ImageChops.difference(A,B)
-        ABAdditionArea = self.getFillPercentage(AminusB,0,0,AminusB.width,AminusB.height)
-        BminusC = ImageChops.difference(B,C)
-        BCAdditionArea = self.getFillPercentage(BminusC,0,0,BminusC.width,BminusC.height)
-        score = 0
-        #print("In Const Add:")
-        #print("AB Added area:"+str(ABAdditionArea))
-        #print("BC Added area:"+str(BCAdditionArea))
-        if ABAdditionArea > 1 and BCAdditionArea > 1:
-            if abs(ABAdditionArea - BCAdditionArea) < 4:
-                similarity = self.Similarity(C,ImageChops.lighter(B,ImageChops.difference(B,C)))
-                score = similarity
-        return  score, ABAdditionArea, BCAdditionArea
+        if self.Similarity(ImageChops.lighter(A,B),B)>99:
+            AminusB = ImageChops.difference(A,B)
+            ABAdditionArea = self.getFillPercentage(AminusB,0,0,AminusB.width,AminusB.height)
+            if self.Similarity(ImageChops.lighter(B,C),C)>99:
+                BminusC = ImageChops.difference(B,C)
+                BCAdditionArea = self.getFillPercentage(BminusC,0,0,BminusC.width,BminusC.height)
+                score = 0
+                #print("In Const Add:")
+                #print("AB Added area:"+str(ABAdditionArea))
+                #print("BC Added area:"+str(BCAdditionArea))
+                if ABAdditionArea > 1 and BCAdditionArea > 1:
+                    if abs(ABAdditionArea - BCAdditionArea) < 4:
+                        similarity = self.Similarity(C,ImageChops.lighter(B,ImageChops.difference(B,C)))
+                        score = similarity
+                return  score, ABAdditionArea, BCAdditionArea
+        return 0,0,0
 
     def ConstantSubtraction(self,A,B,C):
         score, BCSubArea, ABSubArea = self.ConstantAddition(C,B,A)
@@ -504,8 +525,18 @@ class TransformationFinder:
         details = score, xGrowth, yGrowth
         return details
 
-    def Similarity(self,A,B):
+    def Same(self,A,B):
         #returns the percentage of similarity
+        highestScore = 0
+        for i in range(-6,7,2):
+            for j in range(-6,7,2):
+                B1 = ImageChops.offset(B,i,j)
+                s = self.Similarity(A,B1)
+                if s>highestScore:
+                    highestScore = s
+        return highestScore
+
+    def Similarity(self,A,B):
         diff = ImageChops.difference(A,B)
         pixels = diff.getdata()
         whitePixelCount = 0
