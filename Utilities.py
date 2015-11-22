@@ -15,6 +15,7 @@ class Transformation(Enum):
     Migration = 9
     ConstantSubtraction = 11
     Scaling = 10
+    BlobTransforms = 13
     """
     ShapeChange = 0
     Translate = 1
@@ -27,7 +28,7 @@ class Transformation(Enum):
     """
 
 class Blob:
-    def __init__(self,i=0,r=0,c=0,w=0,h=0,f=0):
+    def __init__(self,i=0,r=0,c=0,w=0,h=0,f=0, p=0):
         self.id = i
         self.startRow = r
         self.startCol = c
@@ -36,7 +37,40 @@ class Blob:
         self.width = w
         self.height = h
         self.fill = f
+        self.filledPixels = p;
 
+class BlobPairInfo:
+    def __init__(self):
+        self.iFill = False
+        self.iFilledPixels = False
+        self.iStartRow = False
+        self.iStartCol = False
+        self.iWidth = False
+        self.iHeight = False
+        self.iCenter = False
+
+    def isMorph(self):
+        #if self.iStartCol and self.iStartRow and self.iWidth and self.iHeight:
+        if self.iCenter:
+            if not self.iFill and not self.iFilledPixels:
+                return True
+        return False
+
+    def isSame(self):
+        if self.iStartRow and self.iStartCol and self.iWidth and self.iHeight and self.iFilledPixels and self.iFill:
+            return True
+        return False
+
+    def isTranslated(self):
+        if (self.iStartRow and not self.iStartCol) or (not self.iStartRow and self.iStartCol) or (not self.iStartRow and not self.iStartCol):
+            if not self.iCenter:
+                return True
+        return False
+
+    def isScaled(self):
+        if self.iCenter and self.iFill and (not self.iWidth or not self.iHeight):
+            return True
+        return False
 
 class Attribute(Enum):
     inside = 1

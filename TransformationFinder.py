@@ -1,6 +1,6 @@
 __author__ = 'Bhuvanesh'
 
-from Utilities import Transformation, Blob
+from Utilities import Transformation, Blob, BlobPairInfo
 from PIL import Image, ImageChops, ImageDraw
 from collections import deque, defaultdict
 import math
@@ -36,6 +36,14 @@ class TransformationFinder:
         if max(Tx1.getHighestScore(),Tx2.getHighestScore()) < self.ThresholdScore:
             Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
             Tx4 = self.FindBlobTx(B,self.BlobsB,C,self.BlobsC)
+            Tx5 = self.FindBlobTx(A,self.BlobsA,C,self.BlobsC)
+            #details contains (same,morph,translate,scale,addition,deletion,pattern)
+            if len(Tx5.getBestTxDetails())>0 and Tx5.getBestTxDetails()[1] >=1:
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(1,)) #Adding pattern bit
+                Tx4.setBestTxDetails(Tx4.getBestTxDetails()+(1,))
+            else:
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(0,)) #Adding pattern bit
+                Tx4.setBestTxDetails(Tx4.getBestTxDetails()+(0,))
             Tx.append([Tx3,Tx4])
         return Tx
 
@@ -53,7 +61,24 @@ class TransformationFinder:
         #Blob Transformations (level 3)
         if Tx1.getHighestScore() < self.ThresholdScore:
             Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
+            #details contains (same,morph,translate,scale,addition,deletion,pattern)
+            if len(Tx3.getBestTxDetails())>0 and Tx3.getBestTxDetails()[1] >=1:
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(1,)) #Adding pattern bit
+            else:
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(0,)) #Adding pattern bit
             Tx.append(Tx3)
+        return Tx
+
+    def FindSuperTx(self,A,B,C):
+        Tx = TransformationFrame()
+        Tx.assignTxScore(Transformation.ConstantAddition,self.ConstantAddition(A,B,C))
+        Tx.assignTxScore(Transformation.ConstantSubtraction,self.ConstantSubtraction(A,B,C))
+        Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
+        Tx.assignTxScore(Transformation.Convergence,self.Convergence(A,B,C))
+        correspAC, additionCnt, deletionCnt = self.GetBlobCorrespondence(self.BlobsA,self.BlobsC)
+        ACMetaData = self.GetBlobMetaData(correspAC,self.BlobsA,self.BlobsC)
+        if ACMetaData['repetition'] == False and ACMetaData['oneToOne'] == True:
+            Tx.assignTxScore(Transformation.Migration,self.Migration(A,B,C))
         return Tx
 
     def FindFigureTx(self,A,B):
@@ -70,27 +95,38 @@ class TransformationFinder:
         Tx = TransformationFrame()
         Tx.Blobs.append(BlobsA)
         Tx.Blobs.append(BlobsB)
-        Tx.corresp = self.GetBlobCorrespondence(BlobsA, BlobsB)
+        Tx.corresp, additionsToBlobsB, deletionsInBlobsA = self.GetBlobCorrespondence(BlobsA, BlobsB)
         Tx.BlobMetaData = self.GetBlobMetaData(Tx.corresp,BlobsA,BlobsB)
+        Tx.BlobMetaData['AdditionCount'] = additionsToBlobsB
+        Tx.BlobMetaData['DeletionCount'] = deletionsInBlobsA
         #Blob Transformations ( level 3)
         if Tx.BlobMetaData['repetition'] == False:
             #only if more than one obj is present in figure
-            if len(Tx.corresp.keys()) > 1:
-                Tx.assignTxScore(Transformation.ScalingOfOneObject,self.ScalingOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
-                Tx.assignTxScore(Transformation.TranslationOfOneObject,self.TranslationOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
+            if len(Tx.corresp.keys()) >= 1:
+                details = self.BlobTransforms(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1])
+                details = details + (Tx.BlobMetaData['AdditionCount'],Tx.BlobMetaData['DeletionCount'])
+                Tx.assignTxScore(Transformation.BlobTransforms,details)
+                #Tx.assignTxScore(Transformation.ScalingOfOneObject,self.ScalingOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
+                #Tx.assignTxScore(Transformation.TranslationOfOneObject,self.TranslationOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
         return Tx
 
-    def FindSuperTx(self,A,B,C):
-        Tx = TransformationFrame()
-        Tx.assignTxScore(Transformation.ConstantAddition,self.ConstantAddition(A,B,C))
-        Tx.assignTxScore(Transformation.ConstantSubtraction,self.ConstantSubtraction(A,B,C))
-        Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
-        Tx.assignTxScore(Transformation.Convergence,self.Convergence(A,B,C))
-        correspAC = self.GetBlobCorrespondence(self.BlobsA,self.BlobsC)
-        ACMetaData = self.GetBlobMetaData(correspAC,self.BlobsA,self.BlobsC)
-        if ACMetaData['repetition'] == False and ACMetaData['oneToOne'] == True:
-            Tx.assignTxScore(Transformation.Migration,self.Migration(A,B,C))
-        return Tx
+    def BlobTransforms(self, corresp, BlobsA, BlobsB):
+        morphCount = 0
+        translationCount = 0
+        scalingCount = 0
+        sameCount = 0
+        for aid,bIdAndVals in corresp.items():
+            pairInfo = bIdAndVals[0][2]
+            if pairInfo.isMorph():
+                morphCount += 1
+            if pairInfo.isTranslated():
+                translationCount += 1
+            if pairInfo.isScaled():
+                scalingCount += 1
+            if pairInfo.isSame():
+                sameCount += 1
+        score = 99
+        return score, sameCount, morphCount, translationCount, scalingCount
 
     def Migration(self,A,B,C):
         #Horizontal migration
@@ -335,23 +371,41 @@ class TransformationFinder:
         return 0,0
 
     def GetBlobCorrespondence(self,BlobsA, BlobsB):
+        MAX_DIFF = 6
         ba = BlobsA
         bb = BlobsB
+        remainingABlobs = len(ba)
+        remainingBBlobs = len(bb)
+        notAssignedBBlobs = 0
+        notAssignedABlobs = 0
         corresp = defaultdict(list)
         for b in bb[:]:
-            minDiff = 99 #sum of attribute differences . attributes include start row, start col, width, height, fill
+            assigned = False;
+            minDiff = 99 #sum of attribute differences. attributes include start row, start col, width, height, fill
             corBlobId = 0
+            blobPairInfo = BlobPairInfo()
             for a in ba[:]:
-                s = self.getBlobSimilarityScore(b,a)
-                if s<minDiff:
-                    minDiff = s
-                    corBlobId = a.id
-            corresp[corBlobId].append((b.id,minDiff))
-        return corresp
+                s,info = self.getBlobSimilarityScoreAndInfo(b,a)
+                if s<=minDiff:
+                    if s<MAX_DIFF or info.iCenter:
+                        minDiff = s
+                        corBlobId = a.id
+                        blobPairInfo = info
+                        assigned = True
+            if assigned:
+                corresp[corBlobId].append((b.id,minDiff,blobPairInfo))
+            else:
+                notAssignedBBlobs += 1
+        if len(corresp) < len(ba):
+            notAssignedABlobs = len(ba) - len(corresp)
+        AdditionCount = notAssignedBBlobs
+        DeletionCount = notAssignedABlobs
+        return corresp, AdditionCount, DeletionCount
 
-    def getBlobSimilarityScore(self,b,a):
+    def getBlobSimilarityScoreAndInfo(self,b,a):
         score = 0
-        if b.startCol < a.startCol-1 or b.startCol > a.startCol+1:
+        info = BlobPairInfo()
+        '''if b.startCol < a.startCol-1 or b.startCol > a.startCol+1:
             score = score + 1
         if b.startRow < a.startRow-1 or b.startRow > a.startRow+1:
             score = score + 1
@@ -359,9 +413,43 @@ class TransformationFinder:
             score = score + 1
         if b.height < a.height -1 or b.height > a.height +1:
             score = score + 1
-        if b.fill < a.fill-2 or b.fill > a.fill+2:
-            score = score + 1
-        return score
+        #if b.fill < a.fill-2 or b.fill > a.fill+2:
+        #    score = score + 1
+        '''
+        if self.isInRange(b.startCol,a.startCol,1):
+            info.iStartCol = True
+        else:
+            score += 1
+        if self.isInRange(b.startRow,a.startRow,1):
+            info.iStartRow = True
+        else:
+            score += 1
+        if self.isInRange(b.width,a.width,1):
+            info.iWidth = True
+        else:
+            score += 1
+        if self.isInRange(b.height,a.height,1):
+            info.iHeight = True
+        else:
+            score += 1
+        if self.isInRange(b.fill,a.fill,0.011):#0.004
+            info.iFill = True
+        else:
+            score += 1
+        if self.isInRange(b.filledPixels, a.filledPixels, 34):#22
+            info.iFilledPixels = True
+        else:
+            score += 1
+        if self.isInRange(b.startCol+b.width/2,a.startCol+a.width/2, 5):
+            if self.isInRange(b.startRow+b.height/2,a.startRow+a.height/2, 5):
+                info.iCenter = True
+        return score, info
+
+    def isInRange(self,p,q,range):
+        if p <= q+range and p >= q-range:
+            return True
+        else:
+            return False
 
     def showBlobs(self,A,BlobsA):
         ad = ImageDraw.Draw(A,"1")
@@ -398,7 +486,7 @@ class TransformationFinder:
             b = Blob()
             b.id = id
             #print("into fillBlob"+str(A.width))
-            sr, sc, er, ec, img = self.fillBlob(img,A.width,c,r)
+            sr, sc, er, ec, img, filledPixels = self.fillBlob(img,A.width,c,r)
             #print("out of fillBlob"+str(er)+","+str(ec))
             b.startRow = sr
             b.startCol = sc
@@ -406,7 +494,8 @@ class TransformationFinder:
             b.endCol = ec
             b.width = b.endCol - b.startCol + 1
             b.height = b.endRow - b.startRow + 1
-            b.fill = self.getFillPercentage(A,b.startCol,b.startRow,b.endCol,b.endRow)
+            b.filledPixels = filledPixels
+            b.fill = filledPixels/(b.width*b.height)#self.getFillPercentage(A,b.startCol,b.startRow,b.endCol,b.endRow)
             Blobs.append(b)
             id = id + 1
             img1.putdata(img)
@@ -428,6 +517,7 @@ class TransformationFinder:
         sc = c
         er = r
         ec = c
+        filledPixels = 0
         queue = deque()
         queue.append((c,r))
         while queue:
@@ -436,6 +526,7 @@ class TransformationFinder:
                 for j in range(-1,2):
                     if img[c+j + (r+i)*width] != 0:
                         img[c+j + (r+i)*width] = 0
+                        filledPixels += 1
                         queue.append((c+j,r+i))
                         if r+i > er:
                             er = r+i
@@ -445,7 +536,7 @@ class TransformationFinder:
                             sr = r+i
                         if c+j < sc:
                             sc = c+j
-        return sr,sc, er, ec, img
+        return sr,sc, er, ec, img, filledPixels
 
     def RepetitionByTranslation(self,A,B):
         #a = A.copy()
@@ -567,6 +658,8 @@ class TransformationFrame:
         return self.txType
     def getBestTxDetails(self):
         return self.txDetails
+    def setBestTxDetails(self,details):
+        self.txDetails = details
 
 class BlobFrame:
     def __init__(self):
