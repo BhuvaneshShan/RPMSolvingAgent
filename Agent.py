@@ -61,7 +61,7 @@ class Agent:
         print("Solving "+str(self.problem_number))
         self.Initialize()
         Solution = -1
-        if problem.problemType == '3x3':#and (self.problem_number==20):#or self.problem_number==8 or self.problem_number==16):
+        if problem.problemType == '3x3':# and (self.problem_number==7): #or self.problem_number==9 or self.problem_number==12 or self.problem_number==21):
             #Get images
             A = problem.figures['A'].visualFilename
             A = self.ToBinary(A)
@@ -375,8 +375,8 @@ class Agent:
                                 iAvgFill = self.GetFigAvgFill(BlobsI)
                                 if not self.AlmostEqual(iAvgFill,gAvgFill,0.1) and not self.AlmostEqual(iAvgFill,hAvgFill,0.1):
                                     solution = i
+                                    #solSet.append((i,100-(50*abs(gAvgFill-iAvgFill)+50*abs(hAvgFill-iAvgFill))))
                                     solSet.append((i,0))
-
                                 '''
                                 if BestTxType == Transformation.ScalingOfOneObject:
                                     #print("Chekcing scaling of one obj")

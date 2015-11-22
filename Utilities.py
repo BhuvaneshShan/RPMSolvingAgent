@@ -55,7 +55,7 @@ class BlobPairInfo:
     def isMorph(self):
         #if self.iStartCol and self.iStartRow and self.iWidth and self.iHeight:
         if self.iCenter:
-            if not self.iFill and not self.iFilledPixels:
+            if not self.iFill and not self.iFilledPixels: #and was previously used
                 return True
         #check if this elif is needed
         #elif self.isTranslated() and not self.iFill and not self.iFilledPixels:

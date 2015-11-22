@@ -468,7 +468,10 @@ class TransformationFinder:
             info.iFill = True
         else:
             score += 1
-        if self.isInRange(b.filledPixels, a.filledPixels,42):#34#22
+        if self.isInRange(b.filledPixels, a.filledPixels,42):#change can be .5 percentage #42#34#22
+            #if not self.isInRange(b.filledPixels,a.filledPixels,a.width*a.height*0.005):
+            #   print("b fp: "+str(b.filledPixels)+" a fp:"+str(a.filledPixels)+" cond:"+str(a.width*a.height*0.005))
+            #   print("a wh"+str(a.width)+","+str(a.height))
             info.iFilledPixels = True
         else:
             score += 1
