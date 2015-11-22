@@ -16,6 +16,9 @@ class Transformation(Enum):
     ConstantSubtraction = 11
     Scaling = 10
     BlobTransforms = 13
+    Addition = 14
+    Subtraction = 15
+    AddcumSub = 16
     """
     ShapeChange = 0
     Translate = 1
@@ -54,6 +57,9 @@ class BlobPairInfo:
         if self.iCenter:
             if not self.iFill and not self.iFilledPixels:
                 return True
+        #check if this elif is needed
+        #elif self.isTranslated() and not self.iFill and not self.iFilledPixels:
+         #   return True
         return False
 
     def isSame(self):

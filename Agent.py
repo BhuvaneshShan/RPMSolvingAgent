@@ -61,7 +61,7 @@ class Agent:
         print("Solving "+str(self.problem_number))
         self.Initialize()
         Solution = -1
-        if problem.problemType == '3x3':# and self.problem_number==5:
+        if problem.problemType == '3x3':#and (self.problem_number==20):#or self.problem_number==8 or self.problem_number==16):
             #Get images
             A = problem.figures['A'].visualFilename
             A = self.ToBinary(A)
@@ -145,7 +145,12 @@ class Agent:
 
     def DiagVsHorVert(self, diagTxs, horTxs):
         if diagTxs[0][1] >= horTxs[0][1]:
-            if diagTxs[0][1] == horTxs[0][1] and diagTxs[0][0] == Transformation.BlobTransforms:
+            if diagTxs[0][1] == horTxs[0][1]:# and diagTxs[0][0] == Transformation.BlobTransforms:
+                #if diagTxs[0][0] == Transformation.BlobTransforms and horTxs[0][0] == Transformation.BlobTransforms:
+                #    return self.Diagonal
+                #else:
+                    return self.HorVert
+            elif diagTxs[0][1]-horTxs[0][1] <0.5:
                 return self.HorVert
             return self.Diagonal
         else:
@@ -259,6 +264,21 @@ class Agent:
                             if self.AlmostEqual(HISubArea,BestTxDetails[1],1):
                                 solution = i
                                 solSet.append((i,self.GetDeviation(score,BestTxScore)))
+                    elif BestTxType == Transformation.Addition:
+                        score, z = Tx.Addition(G,H,choices[i])
+                        if self.AlmostEqual(score,BestTxScore,1):
+                            solution = i
+                            solSet.append((i,self.GetDeviation(score,BestTxScore)))
+                    elif BestTxType == Transformation.Subtraction:
+                        score, z = Tx.Subtraction(G,H,choices[i])
+                        if self.AlmostEqual(score,BestTxScore,1):
+                            solution = i
+                            solSet.append((i,self.GetDeviation(score,BestTxScore)))
+                    elif BestTxType == Transformation.AddcumSub:
+                        score, z = Tx.AddcumSub(G,H,choices[i])
+                        if self.AlmostEqual(score,BestTxScore,5):
+                            solution = i
+                            solSet.append((i,self.GetDeviation(score,BestTxScore)))
                     elif BestTxType == Transformation.Divergence:
                         #print("Checking Divergence")
                         score, GHScore, GIScore = Tx.Divergence(G,H,choices[i])
@@ -309,25 +329,54 @@ class Agent:
                         BlobsH = Tx.BlobsB
                         #self.showBlobs(A,BlobsA)
                         BlobsI = Tx.GetBlobs(choices[i])
+                        #                   0                           4                   6                   7
+                        #details contains (same,morph,translate,scale,addition,deletion,blobCountDiffernce,morph pattern)
+                        GHcorresp, GHadditionCount, GHdeletionCount = Tx.GetBlobCorrespondence(BlobsG, BlobsH)
                         HIcorresp, HIadditionCount, HIdeletionCount = Tx.GetBlobCorrespondence(BlobsH, BlobsI)
+                        HIBlobMetaData = Tx.GetBlobMetaData(HIcorresp, BlobsH, BlobsI)
+                        HInumberMorphed = 0
+                        #if HIadditionCount==HIdeletionCount:
+                        #    HInumberMorphed = HIadditionCount
+                        #    HIadditionCount =0
+                        #    HIdeletionCount =0
                         if BestTxDetails[4] == HIadditionCount and BestTxDetails[5] == HIdeletionCount:
-                            BlobMetaData = Tx.GetBlobMetaData(HIcorresp, BlobsH, BlobsI)
-                            if BlobMetaData['repetition'] == False:
+                            if HIBlobMetaData['repetition'] == False:
                                 if len(HIcorresp.keys()) >= 1:
                                     HIscore, HIsameCount, HImorphCount, HItranslationCount, HIscalingCount = Tx.BlobTransforms(HIcorresp,BlobsH,BlobsI)
-                                    if BestTxDetails[6]==1:
+                                    HImorphCount += HInumberMorphed
+
+                                    #if morph pattern
+                                    if BestTxDetails[7]==1:
                                         GIcorresp, GIadditionCount, GIdeletionCount = Tx.GetBlobCorrespondence(BlobsG, BlobsI)
+                                        GInumberMorphed = 0
+                                        #if GIadditionCount==GIdeletionCount:
+                                        #    GInumberMorphed = HIadditionCount
+                                        #    GIadditionCount =0
+                                        #    GIdeletionCount =0
                                         GIscore, GIsameCount, GImorphCount, GItranslationCount, GIscalingCount = Tx.BlobTransforms(GIcorresp,BlobsG,BlobsI)
+                                        GImorphCount += GInumberMorphed
                                         if HImorphCount == GImorphCount:
                                             if BestTxDetails[1] == HImorphCount and BestTxDetails[2] == HItranslationCount and BestTxDetails[3] == HIscalingCount:
                                                 #BestTxDetails[0] == sameCount and
                                                 solution = i
-                                                solSet.append((i,self.GetDeviation(HIscore,BestTxScore)))
+                                                solSet.append((i,self.GetDeviation(HIscore,BestTxScore)+self.GetBlobCorrespDeviation(BlobsG,BlobsH,BlobsI,GHcorresp,HIcorresp)))
                                     else:
+                                        #if no morph pattern
                                         if BestTxDetails[1] == HImorphCount and BestTxDetails[2] == HItranslationCount and BestTxDetails[3] == HIscalingCount:
                                                 #BestTxDetails[0] == sameCount and
                                                 solution = i
-                                                solSet.append((i,self.GetDeviation(HIscore,BestTxScore)))
+                                                solSet.append((i,self.GetDeviation(HIscore,BestTxScore)+self.GetBlobCorrespDeviation(BlobsG,BlobsH,BlobsI,GHcorresp,HIcorresp)))
+
+                        #chekcing blob count diff
+                        if len(BlobsG)>1 and len(BlobsH)>1:
+                            if BestTxDetails[6] == HIBlobMetaData['blobCountDifference']:
+                                gAvgFill = self.GetFigAvgFill(BlobsG)
+                                hAvgFill = self.GetFigAvgFill(BlobsH)
+                                iAvgFill = self.GetFigAvgFill(BlobsI)
+                                if not self.AlmostEqual(iAvgFill,gAvgFill,0.1) and not self.AlmostEqual(iAvgFill,hAvgFill,0.1):
+                                    solution = i
+                                    solSet.append((i,0))
+
                                 '''
                                 if BestTxType == Transformation.ScalingOfOneObject:
                                     #print("Chekcing scaling of one obj")
@@ -404,6 +453,22 @@ class Agent:
 
     def GetDeviation(self,val1,val2):
         return abs(val1-val2)
+
+    def GetBlobCorrespDeviation(self,G,H,I,GHcorresp,HIcorresp):
+        GHfillDeviation = 0
+        HIfillDeviation = 0
+        for k,v in GHcorresp.items():
+            GHfillDeviation += abs(G[k].fill - H[v[0][0]].fill)
+        for k,v in HIcorresp.items():
+            HIfillDeviation += abs(H[k].fill - I[v[0][0]].fill)
+        return abs(HIfillDeviation-GHfillDeviation)
+        pass
+
+    def GetFigAvgFill(self,BlobG):
+        totfill = 0
+        for bg in BlobG[:]:
+            totfill += bg.fill
+        return totfill/len(BlobG)
 
     def AlmostEqual(self,val1,val2,deviation=0):
         if val1>= val2-deviation and val1<=val2+deviation:

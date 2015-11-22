@@ -37,12 +37,16 @@ class TransformationFinder:
             Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
             Tx4 = self.FindBlobTx(B,self.BlobsB,C,self.BlobsC)
             Tx5 = self.FindBlobTx(A,self.BlobsA,C,self.BlobsC)
-            #details contains (same,morph,translate,scale,addition,deletion,pattern)
+            #                   0                           4                   6                   7
+            #details contains (same,morph,translate,scale,addition,deletion,blobCountDiffernce,morph pattern)
+            if len(Tx3.getBestTxDetails())>0 and len(Tx4.getBestTxDetails())>0:
+                if Tx3.getBestTxDetails()[6] != Tx4.getBestTxDetails()[6]:
+                    Tx4.setBestTxDetails(Tx4.getBestTxDetails()[0:6]+(99,))#99denote no common increasing or decreasing blob count difference
             if len(Tx5.getBestTxDetails())>0 and Tx5.getBestTxDetails()[1] >=1:
-                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(1,)) #Adding pattern bit
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(1,)) #Adding morph pattern bit
                 Tx4.setBestTxDetails(Tx4.getBestTxDetails()+(1,))
             else:
-                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(0,)) #Adding pattern bit
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(0,)) #Adding morph pattern bit
                 Tx4.setBestTxDetails(Tx4.getBestTxDetails()+(0,))
             Tx.append([Tx3,Tx4])
         return Tx
@@ -61,11 +65,11 @@ class TransformationFinder:
         #Blob Transformations (level 3)
         if Tx1.getHighestScore() < self.ThresholdScore:
             Tx3 = self.FindBlobTx(A,self.BlobsA,B,self.BlobsB)
-            #details contains (same,morph,translate,scale,addition,deletion,pattern)
+            #details contains (same,morph,translate,scale,addition,deletion,morph pattern)
             if len(Tx3.getBestTxDetails())>0 and Tx3.getBestTxDetails()[1] >=1:
-                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(1,)) #Adding pattern bit
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(1,)) #Adding morph pattern bit
             else:
-                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(0,)) #Adding pattern bit
+                Tx3.setBestTxDetails(Tx3.getBestTxDetails()+(0,)) #Adding morph pattern bit
             Tx.append(Tx3)
         return Tx
 
@@ -73,6 +77,9 @@ class TransformationFinder:
         Tx = TransformationFrame()
         Tx.assignTxScore(Transformation.ConstantAddition,self.ConstantAddition(A,B,C))
         Tx.assignTxScore(Transformation.ConstantSubtraction,self.ConstantSubtraction(A,B,C))
+        Tx.assignTxScore(Transformation.Addition,self.Addition(A,B,C))
+        Tx.assignTxScore(Transformation.Subtraction,self.Subtraction(A,B,C))
+        Tx.assignTxScore(Transformation.AddcumSub,self.AddcumSub(A,B,C))
         Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
         Tx.assignTxScore(Transformation.Convergence,self.Convergence(A,B,C))
         correspAC, additionCnt, deletionCnt = self.GetBlobCorrespondence(self.BlobsA,self.BlobsC)
@@ -97,6 +104,11 @@ class TransformationFinder:
         Tx.Blobs.append(BlobsB)
         Tx.corresp, additionsToBlobsB, deletionsInBlobsA = self.GetBlobCorrespondence(BlobsA, BlobsB)
         Tx.BlobMetaData = self.GetBlobMetaData(Tx.corresp,BlobsA,BlobsB)
+        numberMorphed = 0
+        #if  additionsToBlobsB==deletionsInBlobsA:
+        #    numberMorphed = additionsToBlobsB
+        #    additionsToBlobsB = 0
+        #    deletionsInBlobsA = 0
         Tx.BlobMetaData['AdditionCount'] = additionsToBlobsB
         Tx.BlobMetaData['DeletionCount'] = deletionsInBlobsA
         #Blob Transformations ( level 3)
@@ -104,7 +116,8 @@ class TransformationFinder:
             #only if more than one obj is present in figure
             if len(Tx.corresp.keys()) >= 1:
                 details = self.BlobTransforms(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1])
-                details = details + (Tx.BlobMetaData['AdditionCount'],Tx.BlobMetaData['DeletionCount'])
+                details = (details[0],details[1],details[2]+numberMorphed,details[3],details[4])
+                details = details + (Tx.BlobMetaData['AdditionCount'],Tx.BlobMetaData['DeletionCount'],Tx.BlobMetaData['blobCountDifference'])
                 Tx.assignTxScore(Transformation.BlobTransforms,details)
                 #Tx.assignTxScore(Transformation.ScalingOfOneObject,self.ScalingOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
                 #Tx.assignTxScore(Transformation.TranslationOfOneObject,self.TranslationOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
@@ -127,6 +140,24 @@ class TransformationFinder:
                 sameCount += 1
         score = 99
         return score, sameCount, morphCount, translationCount, scalingCount
+
+    def Addition(self,A,B,C):
+        AplusB = ImageChops.lighter(A,B)
+        score = self.Same(AplusB,C)
+        return score, 0
+
+    def Subtraction(self,A,B,C):
+        AuB = ImageChops.lighter(A,B)
+        Diff = ImageChops.difference(AuB,B)
+        score = self.Same(Diff,C)
+        return score, 0
+
+    def AddcumSub(self,A,B,C):
+        add = ImageChops.lighter(A,B)
+        comm = ImageChops.darker(A,B)
+        Diff = ImageChops.difference(add,comm)
+        score = self.Same(Diff,C)
+        return score, 0
 
     def Migration(self,A,B,C):
         #Horizontal migration
@@ -310,7 +341,8 @@ class TransformationFinder:
                 oneToOne = False
         if len(correspondences) < len(ba):
             oneToOne = False
-        metaData= {'repetition':repetition,'fillComparison':fillPercentage,'oneToOne':oneToOne}
+        blobCountDifference = len(bb)-len(ba)
+        metaData= {'repetition':repetition,'fillComparison':fillPercentage,'oneToOne':oneToOne,'blobCountDifference':blobCountDifference}
         return metaData
     """
     def RepetitionByCircularTranslation(self,A,B):
@@ -436,7 +468,7 @@ class TransformationFinder:
             info.iFill = True
         else:
             score += 1
-        if self.isInRange(b.filledPixels, a.filledPixels, 34):#22
+        if self.isInRange(b.filledPixels, a.filledPixels,42):#34#22
             info.iFilledPixels = True
         else:
             score += 1
