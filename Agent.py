@@ -61,7 +61,7 @@ class Agent:
         print("Solving "+str(self.problem_number))
         self.Initialize()
         Solution = -1
-        if problem.problemType == '3x3':# and (self.problem_number==10): #or self.problem_number==9 or self.problem_number==12 or self.problem_number==21):
+        if problem.problemType == '3x3' and not "Problem C" in problem.name:# and (self.problem_number==10): #or self.problem_number==9 or self.problem_number==12 or self.problem_number==21):
             #Get images
             A = problem.figures['A'].visualFilename
             A = self.ToBinary(A)
@@ -82,30 +82,30 @@ class Agent:
             for i in range(1,self.ThreeX3ChoiceCount+1):
                 self.answerChoices.append(problem.figures[str(i)].visualFilename)
             #Solution = self.FindWholeTransforms(A,B,C,D,E,F,G,H)
-            if Solution == -1:
-                #Find Tx
-                Tx_Hor = self.FindTransformation(A,B,C)
-                #self.dispTx(Tx_Hor)
-                Tx_Ver = self.FindTransformation(A,D,G)
-                #self.dispTx(Tx_Ver)
-                Tx_Diag = self.FindDiagTransformation(A,E)
+            #if Solution == -1:
+            #Find Tx
+            Tx_Hor = self.FindTransformation(A,B,C)
+            #self.dispTx(Tx_Hor)
+            Tx_Ver = self.FindTransformation(A,D,G)
+            #self.dispTx(Tx_Ver)
+            Tx_Diag = self.FindDiagTransformation(A,E)
 
+            #Ordering of Txs
+            BestTxsDiag = self.GetBestTransformations(Tx_Diag)
+            BestTxsHor = self.GetBestTransformations(Tx_Hor)
+
+            #Diag vs HorVert
+            if self.DiagVsHorVert(BestTxsDiag,BestTxsHor) == self.Diagonal:
+                DiagTxSolutionSet = self.CompareAndGetSolution(A,E,BestTxsDiag)
+                Solution = self.GetBestSolution(DiagTxSolutionSet)
+            else:
+                HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxsHor)
                 #Ordering of Txs
-                BestTxsDiag = self.GetBestTransformations(Tx_Diag)
-                BestTxsHor = self.GetBestTransformations(Tx_Hor)
-
-                #Diag vs HorVert
-                if self.DiagVsHorVert(BestTxsDiag,BestTxsHor) == self.Diagonal:
-                    DiagTxSolutionSet = self.CompareAndGetSolution(A,E,BestTxsDiag)
-                    Solution = self.GetBestSolution(DiagTxSolutionSet)
-                else:
-                    HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxsHor)
-                    #Ordering of Txs
-                    BestTxsVer = self.GetBestTransformations(Tx_Ver)
-                    VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxsVer,HorTxSolutionSet)
-                    #Analysing solution set
-                    Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
-            print(" Solution:"+str(Solution))
+                BestTxsVer = self.GetBestTransformations(Tx_Ver)
+                VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxsVer,HorTxSolutionSet)
+                #Analysing solution set
+                Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
+        print(" Solution:"+str(Solution))
         """
         #2x2 solving (Assuming A,B,C and D only in rpm)
         A = problem.figures['A']
@@ -126,10 +126,10 @@ class Agent:
         D = self.Combine(Dr,Dc)
         result = self.Test(D)
         """
-        if(Solution==problem.correctAnswer):
-            print(" Correct Answer: "+str(problem.correctAnswer)+" +")
-        else:
-            print(" Correct Answer: "+str(problem.correctAnswer)+" -")
+        #if(Solution==problem.correctAnswer):
+        #    print(" Correct Answer: "+str(problem.correctAnswer)+" +")
+        #else:
+        #    print(" Correct Answer: "+str(problem.correctAnswer)+" -")
         return Solution
 
     def Initialize(self):
@@ -384,57 +384,63 @@ class Agent:
                                     solution = i
                                     #solSet.append((i,100-(50*abs(gAvgFill-iAvgFill)+50*abs(hAvgFill-iAvgFill))))
                                     solSet.append((i,0))
-                                '''
-                                if BestTxType == Transformation.ScalingOfOneObject:
-                                    #print("Chekcing scaling of one obj")
-                                    score, widthScale, heightScale = Tx.ScalingOfOneObject(corresp,BlobsH,BlobsI)
-                                    #print("Scores:"+str(score)+":"+str(BestTxScore))
-                                    #print("Width scale:"+str(widthScale)+":"+str(BestTxDetails[0]))
-                                    #print("Height scale:"+str(heightScale)+":"+str(BestTxDetails[1]))
-                                    if self.AlmostEqual(score,BestTxScore,1):
-                                        if self.AlmostEqual(widthScale,BestTxDetails[0],0.5):
-                                            if self.AlmostEqual(heightScale,BestTxDetails[1],0.5):
-                                                diff = 0
-                                                for t in BlobMetaData['fillComparison'][:]:
-                                                    #print("t:"+str(t[2]))
-                                                    diff = diff + t[2]
-                                                #print("Diff:"+str(diff))
-                                                if self.AlmostEqual(diff,0,3):
-                                                    solution = i
-                                                    solSet.append((i,self.GetDeviation(score,BestTxScore)))
-                                elif BestTxType == Transformation.TranslationOfOneObject:
-                                    #print("Checking translation of 1 obj")
-                                    score, data = Tx.TranslationOfOneObject(corresp,BlobsH,BlobsI)
-                                    #print("Scores:"+str(score)+":"+str(BestTxScore))
-                                    if self.AlmostEqual(score,BestTxScore,2):
-                                        listOffsetOrg=[]
-                                        listOffsetNew = []
-                                        #print("org")
-                                        for t in BestTxDetails[:]:
-                                            listOffsetOrg.append(t[0][2])
-                                            listOffsetOrg.append(t[0][3])
-                                            #print(":"+str(t[0][2])+","+str(t[0][3]))
-                                        #print("new")
-                                        for t in data[:]:
-                                            listOffsetNew.append(t[2])
-                                            listOffsetNew.append(t[3])
-                                            #print(":"+str(t[2])+","+str(t[3]))
-                                        listOffsetOrg.sort()
-                                        listOffsetNew.sort()
-                                        #print(listOffsetOrg)
-                                        #print(listOffsetNew)
-                                        diff = 0
-                                        for k in range(len(listOffsetOrg)):
-                                            #print(str(listOffsetNew[k])+","+str(listOffsetOrg[k]))
-                                            if self.AlmostEqual(listOffsetNew[k],listOffsetOrg[k],2):
-                                                pass
-                                            else:
-                                                #print("added diff")
-                                                diff = diff + 1
-                                        if diff == 0:
-                                            solution = i
-                                            solSet.append((i,self.GetDeviation(score,BestTxScore)))
-                                '''
+                    elif BestTxType == Transformation.ScalingOfOneObject:
+                        #print("Chekcing scaling of one obj")
+                        BlobsH = Tx.BlobsB
+                        BlobsI = Tx.GetBlobs(choices[i])
+                        corresp, HIadditionCount, HIdeletionCount = Tx.GetBlobCorrespondence(BlobsH, BlobsI)
+                        BlobMetaData = Tx.GetBlobMetaData(HIcorresp, BlobsH, BlobsI)
+                        score, widthScale, heightScale = Tx.ScalingOfOneObject(corresp,BlobsH,BlobsI)
+                        #print("Scores:"+str(score)+":"+str(BestTxScore))
+                        #print("Width scale:"+str(widthScale)+":"+str(BestTxDetails[0]))
+                        #print("Height scale:"+str(heightScale)+":"+str(BestTxDetails[1]))
+                        if self.AlmostEqual(score,BestTxScore,1):
+                            if self.AlmostEqual(widthScale,BestTxDetails[0],0.5):
+                                if self.AlmostEqual(heightScale,BestTxDetails[1],0.5):
+                                    diff = 0
+                                    for t in BlobMetaData['fillComparison'][:]:
+                                        #print("t:"+str(t[2]))
+                                        diff = diff + t[2]
+                                    #print("Diff:"+str(diff))
+                                    if self.AlmostEqual(diff,0,3):
+                                        solution = i
+                                        solSet.append((i,self.GetDeviation(score,BestTxScore)))
+                    elif BestTxType == Transformation.TranslationOfOneObject:
+                        BlobsH = Tx.BlobsB
+                        BlobsI = Tx.GetBlobs(choices[i])
+                        corresp, HIadditionCount, HIdeletionCount = Tx.GetBlobCorrespondence(BlobsH, BlobsI)
+                        #BlobMetaData = Tx.GetBlobMetaData(HIcorresp, BlobsH, BlobsI)
+                        #print("Checking translation of 1 obj")
+                        score, data = Tx.TranslationOfOneObject(corresp,BlobsH,BlobsI)
+                        #print("Scores:"+str(score)+":"+str(BestTxScore))
+                        if self.AlmostEqual(score,BestTxScore,2):
+                            listOffsetOrg=[]
+                            listOffsetNew = []
+                            #print("org")
+                            for t in BestTxDetails[:]:
+                                listOffsetOrg.append(t[0][2])
+                                listOffsetOrg.append(t[0][3])
+                                #print(":"+str(t[0][2])+","+str(t[0][3]))
+                            #print("new")
+                            for t in data[:]:
+                                listOffsetNew.append(t[2])
+                                listOffsetNew.append(t[3])
+                                #print(":"+str(t[2])+","+str(t[3]))
+                            listOffsetOrg.sort()
+                            listOffsetNew.sort()
+                            #print(listOffsetOrg)
+                            #print(listOffsetNew)
+                            diff = 0
+                            for k in range(len(listOffsetOrg)):
+                                #print(str(listOffsetNew[k])+","+str(listOffsetOrg[k]))
+                                if self.AlmostEqual(listOffsetNew[k],listOffsetOrg[k],2):
+                                    pass
+                                else:
+                                    #print("added diff")
+                                    diff = diff + 1
+                            if diff == 0:
+                                solution = i
+                                solSet.append((i,self.GetDeviation(score,BestTxScore)))
         return solSet
 
     def AnalyseSolutionSet(self, HorSolSet, VerSolSet):

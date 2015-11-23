@@ -120,8 +120,8 @@ class TransformationFinder:
                 details = (details[0],details[1],details[2]+numberMorphed,details[3],details[4])
                 details = details + (Tx.BlobMetaData['AdditionCount'],Tx.BlobMetaData['DeletionCount'],Tx.BlobMetaData['blobCountDifference'])
                 Tx.assignTxScore(Transformation.BlobTransforms,details)
-                #Tx.assignTxScore(Transformation.ScalingOfOneObject,self.ScalingOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
-                #Tx.assignTxScore(Transformation.TranslationOfOneObject,self.TranslationOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
+                Tx.assignTxScore(Transformation.ScalingOfOneObject,self.ScalingOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
+                Tx.assignTxScore(Transformation.TranslationOfOneObject,self.TranslationOfOneObject(Tx.corresp,Tx.Blobs[0],Tx.Blobs[1]))
         return Tx
 
     def BlobTransforms(self, corresp, BlobsA, BlobsB):
@@ -177,64 +177,21 @@ class TransformationFinder:
         BCscore = 0
         croppedBlobs = []
         migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
-        for b in self.BlobsA[:]:
-            if b.startCol<self.IMAGE_WIDTH/2:
-                migDir.append(1)
-            else:
-                migDir.append(-1)
-            migCol.append(b.startCol)
-            cropped = A.crop((b.startCol,b.startRow,b.endCol,b.endRow))
-            croppedBlobs.append(cropped)
-        for i in range(1,int(self.IMAGE_WIDTH  - migCol[0])+1):
-            migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
-            for b in self.BlobsA:
-                newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
-                migCol[b.id] = migCol[b.id]+migDir[b.id]
-                newImage.paste(croppedBlobs[b.id],(migCol[b.id],b.startRow))
-                migImage = ImageChops.lighter(migImage,newImage)
-            score = self.Similarity(migImage,B)
-            if score >= 98:
-                ABscore = score
-                break
-        #migImage.save(str(time.time())+"_AB.png","PNG")
-        if ABscore >= 98:
-            for i in range(1,int(self.IMAGE_WIDTH - migCol[0])+1):
+        if len(self.BlobsA) >0:
+            for b in self.BlobsA[:]:
+                if b.startCol<self.IMAGE_WIDTH/2:
+                    migDir.append(1)
+                else:
+                    migDir.append(-1)
+                migCol.append(b.startCol)
+                cropped = A.crop((b.startCol,b.startRow,b.endCol,b.endRow))
+                croppedBlobs.append(cropped)
+            for i in range(1,int(self.IMAGE_WIDTH  - migCol[0])+1):
                 migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
                 for b in self.BlobsA:
                     newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
                     migCol[b.id] = migCol[b.id]+migDir[b.id]
                     newImage.paste(croppedBlobs[b.id],(migCol[b.id],b.startRow))
-                    migImage = ImageChops.lighter(migImage,newImage)
-                score = self.Similarity(migImage,C)
-                if score >= 96:
-                    BCscore = score
-                    break
-        #migImage.save(str(time.time())+"_BC.png","PNG")
-        if ABscore>=98 and BCscore >= 96:
-            return (ABscore+BCscore)/2, ABscore, BCscore
-        else:
-            #vertical migration
-            migDir = []
-            #migCol is migRow here
-            migCol = []
-            ABscore = 0
-            BCscore = 0
-            croppedBlobs = []
-            migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
-            for b in self.BlobsA[:]:
-                if b.startRow<self.IMAGE_HEIGHT/2:
-                    migDir.append(1)
-                else:
-                    migDir.append(-1)
-                migCol.append(b.startRow)
-                cropped = A.crop((b.startCol,b.startRow,b.endCol,b.endRow))
-                croppedBlobs.append(cropped)
-            for i in range(1,int(self.IMAGE_HEIGHT - migCol[0])+1):
-                migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
-                for b in self.BlobsA:
-                    newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
-                    migCol[b.id] = migCol[b.id]+migDir[b.id]
-                    newImage.paste(croppedBlobs[b.id],(b.startCol,migCol[b.id]))
                     migImage = ImageChops.lighter(migImage,newImage)
                 score = self.Similarity(migImage,B)
                 if score >= 98:
@@ -242,6 +199,37 @@ class TransformationFinder:
                     break
             #migImage.save(str(time.time())+"_AB.png","PNG")
             if ABscore >= 98:
+                for i in range(1,int(self.IMAGE_WIDTH - migCol[0])+1):
+                    migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                    for b in self.BlobsA:
+                        newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                        migCol[b.id] = migCol[b.id]+migDir[b.id]
+                        newImage.paste(croppedBlobs[b.id],(migCol[b.id],b.startRow))
+                        migImage = ImageChops.lighter(migImage,newImage)
+                    score = self.Similarity(migImage,C)
+                    if score >= 96:
+                        BCscore = score
+                        break
+            #migImage.save(str(time.time())+"_BC.png","PNG")
+            if ABscore>=98 and BCscore >= 96:
+                return (ABscore+BCscore)/2, ABscore, BCscore
+            else:
+                #vertical migration
+                migDir = []
+                #migCol is migRow here
+                migCol = []
+                ABscore = 0
+                BCscore = 0
+                croppedBlobs = []
+                migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                for b in self.BlobsA[:]:
+                    if b.startRow<self.IMAGE_HEIGHT/2:
+                        migDir.append(1)
+                    else:
+                        migDir.append(-1)
+                    migCol.append(b.startRow)
+                    cropped = A.crop((b.startCol,b.startRow,b.endCol,b.endRow))
+                    croppedBlobs.append(cropped)
                 for i in range(1,int(self.IMAGE_HEIGHT - migCol[0])+1):
                     migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
                     for b in self.BlobsA:
@@ -249,12 +237,25 @@ class TransformationFinder:
                         migCol[b.id] = migCol[b.id]+migDir[b.id]
                         newImage.paste(croppedBlobs[b.id],(b.startCol,migCol[b.id]))
                         migImage = ImageChops.lighter(migImage,newImage)
-                    score = self.Similarity(migImage,C)
-                    if score >= 96:
-                        BCscore = score
+                    score = self.Similarity(migImage,B)
+                    if score >= 98:
+                        ABscore = score
                         break
-            #migImage.save(str(time.time())+"_BC.png","PNG")
-            return (ABscore+BCscore)/2, ABscore, BCscore
+                #migImage.save(str(time.time())+"_AB.png","PNG")
+                if ABscore >= 98:
+                    for i in range(1,int(self.IMAGE_HEIGHT - migCol[0])+1):
+                        migImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                        for b in self.BlobsA:
+                            newImage = Image.new("1",(self.IMAGE_WIDTH,self.IMAGE_HEIGHT))
+                            migCol[b.id] = migCol[b.id]+migDir[b.id]
+                            newImage.paste(croppedBlobs[b.id],(b.startCol,migCol[b.id]))
+                            migImage = ImageChops.lighter(migImage,newImage)
+                        score = self.Similarity(migImage,C)
+                        if score >= 96:
+                            BCscore = score
+                            break
+        #migImage.save(str(time.time())+"_BC.png","PNG")
+        return (ABscore+BCscore)/2, ABscore, BCscore
 
     def Divergence(self,A,B,C):
         #A super transformation where object in A splits into two
