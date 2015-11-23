@@ -19,6 +19,7 @@ class Transformation(Enum):
     Addition = 14
     Subtraction = 15
     AddcumSub = 16
+    Common = 17
     """
     ShapeChange = 0
     Translate = 1
@@ -63,7 +64,7 @@ class BlobPairInfo:
         return False
 
     def isSame(self):
-        if self.iStartRow and self.iStartCol and self.iWidth and self.iHeight and self.iFilledPixels and self.iFill:
+        if self.iStartRow and self.iStartCol and self.iWidth and self.iHeight and self.iFilledPixels and self.iFill:#
             return True
         return False
 

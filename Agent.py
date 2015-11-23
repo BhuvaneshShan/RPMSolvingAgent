@@ -61,7 +61,7 @@ class Agent:
         print("Solving "+str(self.problem_number))
         self.Initialize()
         Solution = -1
-        if problem.problemType == '3x3':# and (self.problem_number==7): #or self.problem_number==9 or self.problem_number==12 or self.problem_number==21):
+        if problem.problemType == '3x3':# and (self.problem_number==10): #or self.problem_number==9 or self.problem_number==12 or self.problem_number==21):
             #Get images
             A = problem.figures['A'].visualFilename
             A = self.ToBinary(A)
@@ -81,28 +81,30 @@ class Agent:
             H = self.ToBinary(H)
             for i in range(1,self.ThreeX3ChoiceCount+1):
                 self.answerChoices.append(problem.figures[str(i)].visualFilename)
-            #Find Tx
-            Tx_Hor = self.FindTransformation(A,B,C)
-            #self.dispTx(Tx_Hor)
-            Tx_Ver = self.FindTransformation(A,D,G)
-            #self.dispTx(Tx_Ver)
-            Tx_Diag = self.FindDiagTransformation(A,E)
+            #Solution = self.FindWholeTransforms(A,B,C,D,E,F,G,H)
+            if Solution == -1:
+                #Find Tx
+                Tx_Hor = self.FindTransformation(A,B,C)
+                #self.dispTx(Tx_Hor)
+                Tx_Ver = self.FindTransformation(A,D,G)
+                #self.dispTx(Tx_Ver)
+                Tx_Diag = self.FindDiagTransformation(A,E)
 
-            #Ordering of Txs
-            BestTxsDiag = self.GetBestTransformations(Tx_Diag)
-            BestTxsHor = self.GetBestTransformations(Tx_Hor)
-
-            #Diag vs HorVert
-            if self.DiagVsHorVert(BestTxsDiag,BestTxsHor) == self.Diagonal:
-                DiagTxSolutionSet = self.CompareAndGetSolution(A,E,BestTxsDiag)
-                Solution = self.GetBestSolution(DiagTxSolutionSet)
-            else:
-                HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxsHor)
                 #Ordering of Txs
-                BestTxsVer = self.GetBestTransformations(Tx_Ver)
-                VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxsVer,HorTxSolutionSet)
-                #Analysing solution set
-                Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
+                BestTxsDiag = self.GetBestTransformations(Tx_Diag)
+                BestTxsHor = self.GetBestTransformations(Tx_Hor)
+
+                #Diag vs HorVert
+                if self.DiagVsHorVert(BestTxsDiag,BestTxsHor) == self.Diagonal:
+                    DiagTxSolutionSet = self.CompareAndGetSolution(A,E,BestTxsDiag)
+                    Solution = self.GetBestSolution(DiagTxSolutionSet)
+                else:
+                    HorTxSolutionSet  = self.CompareAndGetSolution(G,H,BestTxsHor)
+                    #Ordering of Txs
+                    BestTxsVer = self.GetBestTransformations(Tx_Ver)
+                    VerTxSolutionSet = self.CompareAndGetSolution(C,F,BestTxsVer,HorTxSolutionSet)
+                    #Analysing solution set
+                    Solution = self.AnalyseSolutionSet(HorTxSolutionSet,VerTxSolutionSet)
             print(" Solution:"+str(Solution))
         """
         #2x2 solving (Assuming A,B,C and D only in rpm)
@@ -277,6 +279,11 @@ class Agent:
                     elif BestTxType == Transformation.AddcumSub:
                         score, z = Tx.AddcumSub(G,H,choices[i])
                         if self.AlmostEqual(score,BestTxScore,5):
+                            solution = i
+                            solSet.append((i,self.GetDeviation(score,BestTxScore)))
+                    elif BestTxType == Transformation.Common:
+                        score, z = Tx.Common(G,H,choices[i])
+                        if self.AlmostEqual(score,BestTxScore,2):
                             solution = i
                             solSet.append((i,self.GetDeviation(score,BestTxScore)))
                     elif BestTxType == Transformation.Divergence:
@@ -475,6 +482,28 @@ class Agent:
             return True
         else:
             return False
+
+    def FindWholeTransforms(self,A,B,C,D,E,F,G,H):
+        Tf = TransformationFinder()
+        choices = []
+        choices.append(0)
+        for option in self.answerChoices:
+            choices.append(self.ToBinary(option))
+        solution = -1
+        if solution == -1:
+            axb = ImageChops.logical_xor(A,B)
+            axbxc = ImageChops.logical_xor(axb,C)
+            dxe = ImageChops.logical_xor(D,E)
+            dxexf = ImageChops.logical_xor(dxe,F)
+            score = Tf.Similarity(axbxc,dxexf)
+            if score > 96:
+                gxh = ImageChops.logical_xor(G,H)
+                for i in range(1,len(choices)):
+                    gxhxi = ImageChops.logical_xor(gxh,choices[i])
+                    s = Tf.Similarity(axbxc,gxhxi)
+                    if s > 95:
+                        return i
+        return solution
 
     def ToBinary(self, a):
         image_file = Image.open(a)  # open colour image

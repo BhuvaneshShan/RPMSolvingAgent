@@ -80,6 +80,7 @@ class TransformationFinder:
         Tx.assignTxScore(Transformation.Addition,self.Addition(A,B,C))
         Tx.assignTxScore(Transformation.Subtraction,self.Subtraction(A,B,C))
         Tx.assignTxScore(Transformation.AddcumSub,self.AddcumSub(A,B,C))
+        Tx.assignTxScore(Transformation.Common,self.Common(A,B,C))
         Tx.assignTxScore(Transformation.Divergence,self.Divergence(A,B,C))
         Tx.assignTxScore(Transformation.Convergence,self.Convergence(A,B,C))
         correspAC, additionCnt, deletionCnt = self.GetBlobCorrespondence(self.BlobsA,self.BlobsC)
@@ -157,6 +158,11 @@ class TransformationFinder:
         comm = ImageChops.darker(A,B)
         Diff = ImageChops.difference(add,comm)
         score = self.Same(Diff,C)
+        return score, 0
+
+    def Common(self,A,B,C):
+        common = ImageChops.darker(A,B)
+        score = self.Same(common,C)
         return score, 0
 
     def Migration(self,A,B,C):
